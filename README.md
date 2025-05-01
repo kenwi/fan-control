@@ -164,7 +164,7 @@ The script will generate a `custom_fan_curve.png` file showing how your fan spee
 The fan speed is calculated using cubic interpolation:
 
 $$
-\text{fan\_speed} = \text{FAN\_MIN} + \frac{(\text{temp} - \text{TEMP\_MIN})^3 \times (\text{FAN\_MAX} - \text{FAN\_MIN})}{(\text{TEMP\_MAX} - \text{TEMP\_MIN})^3}
+\text{fanSpeed} = \text{fanMin} + \frac{(\text{temp} - \text{tempMin})^3 \times (\text{fanMax} - \text{fanMin})}{(\text{tempMax} - \text{tempMin})^3}
 $$
 
 This formula provides:
