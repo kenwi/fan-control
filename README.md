@@ -68,6 +68,33 @@ The system uses the following default parameters:
    sudo systemctl status fan-control.service
    ```
 
+## Convenient Monitoring
+
+For easier monitoring of your system's fan and temperature status, you can add these aliases to your `~/.bash_aliases` file:
+
+```bash
+# Quick status check of PWM values and main temperatures
+alias fan-control-status='echo "Fan Speeds:"; for fan in 1 2 4; do echo "Fan $fan: $(cat /sys/class/hwmon/hwmon4/pwm${fan})"; done; echo -e "\nTemperatures:"; echo "CPU: $(($(cat /sys/class/hwmon/hwmon4/temp2_input)/1000))°C"; echo "System: $(($(cat /sys/class/hwmon/hwmon4/temp1_input)/1000))°C"'
+
+# Detailed fan speed information
+alias fan-control-speeds='echo "Current Fan Speeds:"; for i in {1..7}; do label=$(cat /sys/class/hwmon/hwmon4/fan${i}_label 2>/dev/null); speed=$(cat /sys/class/hwmon/hwmon4/fan${i}_input 2>/dev/null); if [ ! -z "$speed" ]; then if [ ! -z "$label" ]; then echo "Fan $i ($label): $speed RPM"; else echo "Fan $i: $speed RPM"; fi; else echo "Fan $i: N/A"; fi; done'
+
+# Detailed temperature information
+alias fan-control-temperatures='echo "Temperature Sensors:"; for i in {1..7}; do echo -n "Temp $i ($(cat /sys/class/hwmon/hwmon4/temp${i}_label 2>/dev/null || echo "Unknown")): "; temp=$(cat /sys/class/hwmon/hwmon4/temp${i}_input 2>/dev/null); if [ ! -z "$temp" ]; then echo "$(echo "scale=1; $temp/1000" | bc)°C"; else echo "N/A"; fi; done'
+```
+
+After adding these aliases:
+1. Save the file
+2. Reload your aliases:
+   ```bash
+   source ~/.bash_aliases
+   ```
+
+Now you can use these convenient commands:
+- `fan-control-status`: Quick overview of PWM values and main temperatures
+- `fan-control-speeds`: Detailed fan speed information for all fans
+- `fan-control-temperatures`: Detailed temperature information for all sensors
+
 ## Monitoring
 
 The service logs its activity to the system journal. You can monitor the logs using:
