@@ -15,6 +15,19 @@ The curve shows how fan speed varies with temperature:
 - 50°C to 75°C: Fan speed increases following a cubic curve
 - Above 75°C: Fan speed maxes out at 100% PWM
 
+## How It Works
+
+The fan speed is calculated using cubic interpolation:
+
+$$
+\text{fanSpeed} = \text{fanMin} + \frac{(\text{temp} - \text{tempMin})^3 \times (\text{fanMax} - \text{fanMin})}{(\text{tempMax} - \text{tempMin})^3}
+$$
+
+This formula provides:
+- Very gentle increases at lower temperatures
+- More aggressive increases at higher temperatures
+- Smooth transitions throughout the temperature range
+
 ## Configuration
 
 The system uses the following default parameters:
@@ -186,18 +199,6 @@ You can generate a visualization of the fan curve with your custom settings usin
 
 The script will generate a `custom_fan_curve.png` file showing how your fan speeds will vary with temperature. You can adjust the `TEMP_MIN`, `TEMP_MAX`, `FAN_MIN`, and `FAN_MAX` values to experiment with different configurations before applying them to your system.
 
-## How It Works
-
-The fan speed is calculated using cubic interpolation:
-
-$$
-\text{fanSpeed} = \text{fanMin} + \frac{(\text{temp} - \text{tempMin})^3 \times (\text{fanMax} - \text{fanMin})}{(\text{tempMax} - \text{tempMin})^3}
-$$
-
-This formula provides:
-- Very gentle increases at lower temperatures
-- More aggressive increases at higher temperatures
-- Smooth transitions throughout the temperature range
 
 ## Requirements
 
