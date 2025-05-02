@@ -204,8 +204,13 @@ The script will generate a `custom_fan_curve.png` file showing how your fan spee
 
 - Linux system with NCT6798-based motherboard
 - Python 3 with numpy and matplotlib (for curve visualization)
+- NCT6775/NCT6798 kernel module (may need to be loaded manually with `sudo modprobe nct6775`)
 
 ## Notes
 
 - Make sure to disable any BIOS/UEFI fan control features before using this script
-- Monitor system temperatures when first using the script to ensure proper cooling 
+- Monitor system temperatures when first using the script to ensure proper cooling
+- If fan control files are not found in `/sys/class/hwmon/hwmon4/`, you may need to:
+  1. Check available hwmon devices: `ls -l /sys/class/hwmon/`
+  2. Load the NCT6775 module: `sudo modprobe nct6775`
+  3. Update the paths in the script to match your system's hwmon number 
