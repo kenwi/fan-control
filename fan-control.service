@@ -4,7 +4,7 @@ After=multi-user.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/fan-control.sh
+ExecStart=/usr/local/bin/fan-control
 Restart=always
 RestartSec=5
 
