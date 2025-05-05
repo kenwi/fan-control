@@ -36,16 +36,94 @@ The system uses the following default parameters:
 - `FAN_MIN`: 20 (≈8% PWM) - Minimum fan speed
 - `FAN_MAX`: 255 (100% PWM) - Maximum fan speed
 
+## Configuration File
+
+The system uses a configuration file located at `/etc/fan-control.conf`. This file is automatically created with default values when you first run the script. You can modify these values to customize the fan control behavior.
+
+### Default Configuration
+
+The configuration file includes the following settings:
+
+```ini
+# Temperature thresholds (in °C)
+TEMP_MIN=50
+TEMP_MAX=75
+
+# Fan speed limits (0-255)
+FAN_MIN=25
+FAN_MAX=255
+
+# Check interval (in seconds)
+CHECK_INTERVAL=5
+
+# Temperature hysteresis (in °C)
+TEMP_HYST=1
+
+# CSV logging configuration
+CSV_DIR="/var/log"
+CSV_DELIMITER=","
+
+# Fan paths (only for connected fans)
+FAN1_PWM="/sys/class/hwmon/hwmon3/pwm1"
+FAN2_PWM="/sys/class/hwmon/hwmon3/pwm2"
+FAN4_PWM="/sys/class/hwmon/hwmon3/pwm4"
+
+# PWM mode paths
+FAN1_MODE="/sys/class/hwmon/hwmon3/pwm1_mode"
+FAN2_MODE="/sys/class/hwmon/hwmon3/pwm2_mode"
+FAN4_MODE="/sys/class/hwmon/hwmon3/pwm4_mode"
+
+# PWM enable paths
+FAN1_ENABLE="/sys/class/hwmon/hwmon3/pwm1_enable"
+FAN2_ENABLE="/sys/class/hwmon/hwmon3/pwm2_enable"
+FAN4_ENABLE="/sys/class/hwmon/hwmon3/pwm4_enable"
+
+# Temperature sensor paths
+CPU_TEMP="/sys/class/hwmon/hwmon3/temp2_input"  # CPUTIN
+SYS_TEMP="/sys/class/hwmon/hwmon3/temp1_input"  # SYSTIN
+PECI_TEMP="/sys/class/hwmon/hwmon3/temp8_input" # PECI Agent 0
+```
+
+### Customizing the Configuration
+
+You can modify the configuration file directly:
+
+```bash
+sudo nano /etc/fan-control.conf
+```
+
+Or use command-line options to override specific settings:
+
+```bash
+# Set custom temperature thresholds
+--min-temp 45 --max-temp 80
+
+# Set custom fan speed limits
+--min-speed 10 --max-speed 100
+
+# Set custom check interval
+--interval 10
+
+# Set custom CSV log directory
+--csv-dir /path/to/logs
+```
+
+Note: If you modify the hardware paths (fan and temperature sensor paths), make sure they match your system's configuration. You can find the correct paths by checking the available hwmon devices:
+
+```bash
+ls -l /sys/class/hwmon/
+```
+
 ## Installation
 
 1. Copy the `fan-control.sh` script to your system:
    ```bash
-   sudo cp fan-control.sh /usr/local/bin/
+   sudo cp fan-control.sh /usr/local/bin/fan-control
    ```
 
 2. Make it executable:
    ```bash
-   sudo chmod +x /usr/local/bin/fan-control.sh
+   sudo chmod +x /usr/local/bin/fan-control
    ```
 
 3. Create a systemd service file:
@@ -61,7 +139,7 @@ The system uses the following default parameters:
 
    [Service]
    Type=simple
-   ExecStart=/usr/local/bin/fan-control.sh
+   ExecStart=/usr/local/bin/fan-control
    Restart=always
    RestartSec=5
 
@@ -124,6 +202,62 @@ journalctl -u fan-control.service --since "1 hour ago"
 
 # View logs with timestamps
 journalctl -u fan-control.service -o short-precise
+```
+
+## CSV Logging
+
+The system automatically logs temperature and fan speed data to CSV files for long-term monitoring and analysis. By default, logs are stored in `/var/log` with daily rotation.
+
+### CSV Log Format
+
+Each CSV file contains the following columns:
+- Timestamp
+- CPU Temperature (°C)
+- System Temperature (°C)
+- PECI Temperature (°C)
+- CPU Usage (%)
+- Fan Speed (%)
+
+### Configuration
+
+You can customize the CSV logging behavior using these configuration options:
+
+```bash
+# Change the CSV log directory (default: /var/log)
+--csv-dir /path/to/logs
+
+# Change the CSV delimiter (default: ,)
+--csv-delimiter ";"
+```
+
+### Example CSV Output
+
+```
+Timestamp,CPU Temp (°C),System Temp (°C),PECI Temp (°C),CPU Usage (%),Fan Speed (%)
+2024-03-21 14:30:00,45,42,48,25,30
+2024-03-21 14:30:05,46,43,49,30,35
+```
+
+### Analyzing the Data
+
+You can use tools like Python with pandas to analyze the logged data:
+
+```python
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Read the CSV file
+df = pd.read_csv('/var/log/temperatures_2024-03-21.csv')
+
+# Plot temperature and fan speed over time
+plt.figure(figsize=(12, 6))
+plt.plot(df['Timestamp'], df['CPU Temp (°C)'], label='CPU Temp')
+plt.plot(df['Timestamp'], df['System Temp (°C)'], label='System Temp')
+plt.plot(df['Timestamp'], df['Fan Speed (%)'], label='Fan Speed')
+plt.legend()
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.savefig('temperature_analysis.png')
 ```
 
 ## Visualizing the Fan Curve
