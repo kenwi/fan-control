@@ -3,16 +3,35 @@
 # Fan control script for NCT6798
 # This script monitors temperatures and adjusts fan speeds accordingly
 
-# Default configuration
-TEMP_MIN=50000   # 50°C - Start increasing fan speed
-TEMP_MAX=75000   # 75°C - Maximum temperature before full speed
-FAN_MIN=20       # ~8% - Minimum fan speed
-FAN_MAX=255      # 100% - Maximum fan speed
-CHECK_INTERVAL=5 # 5 seconds
-TEMP_HYST=1000   # 1°C hysteresis to prevent frequent speed changes
-CSV_FILE=""      # CSV file path for temperature logging
-CSV_DELIMITER="," # CSV delimiter (can be changed to ; or tab)
-CSV_DIR=""       # Directory for CSV files
+# Default configuration file
+CONFIG_FILE="/etc/fan-control.conf"
+
+# Function to load configuration
+load_config() {
+    if [ -f "$CONFIG_FILE" ]; then
+        # Source the config file
+        . "$CONFIG_FILE"
+    else
+        # Create default config file if it doesn't exist
+        cat > "$CONFIG_FILE" << EOF
+# Fan Control Configuration
+# Temperature thresholds (in °C)
+TEMP_MIN=50
+TEMP_MAX=75
+
+# Fan speed limits (0-255)
+FAN_MIN=25
+FAN_MAX=255
+
+# Check interval (in seconds)
+CHECK_INTERVAL=5
+
+# Temperature hysteresis (in °C)
+TEMP_HYST=1
+
+# CSV logging configuration
+CSV_DIR="/var/log"
+CSV_DELIMITER=","
 
 # Fan paths (only for connected fans)
 FAN1_PWM="/sys/class/hwmon/hwmon3/pwm1"
@@ -33,13 +52,19 @@ FAN4_ENABLE="/sys/class/hwmon/hwmon3/pwm4_enable"
 CPU_TEMP="/sys/class/hwmon/hwmon3/temp2_input"  # CPUTIN
 SYS_TEMP="/sys/class/hwmon/hwmon3/temp1_input"  # SYSTIN
 PECI_TEMP="/sys/class/hwmon/hwmon3/temp8_input" # PECI Agent 0
+EOF
+        # Source the newly created config file
+        . "$CONFIG_FILE"
+    fi
+}
 
-# Store last fan speed for hysteresis
-LAST_FAN_SPEED=$FAN_MIN
+# Load configuration
+load_config
 
-# Store last CPU usage values
-LAST_CPU_TOTAL=0
-LAST_CPU_IDLE=0
+# Convert temperature and fan speed values to internal format
+TEMP_MIN=$((TEMP_MIN * 1000))
+TEMP_MAX=$((TEMP_MAX * 1000))
+TEMP_HYST=$((TEMP_HYST * 1000))
 
 # Function to show usage
 show_usage() {
@@ -53,16 +78,11 @@ show_usage() {
     echo "  --interval SECONDS  Set check interval in seconds (default: 5)"
     echo "  --csv-dir DIR      Directory for CSV files (enables daily rotation)"
     echo "  --csv-delimiter D  CSV delimiter (default: ,)"
+    echo "  --config FILE      Use alternative config file (default: /etc/fan-control.conf)"
     echo "  --help             Show this help message"
     echo
     echo "Without options, runs in automatic temperature-based control mode."
     exit 1
-}
-
-# Function to convert percentage to PWM value (0-255)
-percent_to_pwm() {
-    local percent=$1
-    echo $((percent * 255 / 100))
 }
 
 # Function to get temperature in millidegrees
@@ -186,14 +206,10 @@ calculate_fan_speed() {
 
 # Function to get current CSV file path
 get_csv_file() {
-    if [ ! -z "$CSV_DIR" ]; then
-        # Create directory if it doesn't exist
-        mkdir -p "$CSV_DIR"
-        # Return path with current date
-        echo "$CSV_DIR/temperatures_$(date '+%Y-%m-%d').csv"
-    else
-        echo "$CSV_FILE"
-    fi
+    # Create directory if it doesn't exist
+    mkdir -p "$CSV_DIR"
+    # Return path with current date
+    echo "$CSV_DIR/temperatures_$(date '+%Y-%m-%d').csv"
 }
 
 # Function to write data to CSV file
@@ -205,7 +221,7 @@ write_to_csv() {
     local fan_speed=$5
     local current_csv_file
 
-    if [ ! -z "$CSV_FILE" ] || [ ! -z "$CSV_DIR" ]; then
+    if [ ! -z "$CSV_DIR" ]; then
         current_csv_file=$(get_csv_file)
         # Create file with headers if it doesn't exist
         if [ ! -f "$current_csv_file" ]; then
@@ -243,16 +259,17 @@ while [[ $# -gt 0 ]]; do
             CHECK_INTERVAL="$2"
             shift 2
             ;;
-        --csv-file)
-            CSV_FILE="$2"
-            shift 2
-            ;;
         --csv-dir)
             CSV_DIR="$2"
             shift 2
             ;;
         --csv-delimiter)
             CSV_DELIMITER="$2"
+            shift 2
+            ;;
+        --config)
+            CONFIG_FILE="$2"
+            load_config
             shift 2
             ;;
         --help)
