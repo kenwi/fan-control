@@ -10,26 +10,29 @@ FAN_MIN=20       # ~8% - Minimum fan speed
 FAN_MAX=255      # 100% - Maximum fan speed
 CHECK_INTERVAL=5 # 5 seconds
 TEMP_HYST=1000   # 1°C hysteresis to prevent frequent speed changes
+CSV_FILE=""      # CSV file path for temperature logging
+CSV_DELIMITER="," # CSV delimiter (can be changed to ; or tab)
+CSV_DIR=""       # Directory for CSV files
 
 # Fan paths (only for connected fans)
-FAN1_PWM="/sys/class/hwmon/hwmon4/pwm1"
-FAN2_PWM="/sys/class/hwmon/hwmon4/pwm2"
-FAN4_PWM="/sys/class/hwmon/hwmon4/pwm4"
+FAN1_PWM="/sys/class/hwmon/hwmon3/pwm1"
+FAN2_PWM="/sys/class/hwmon/hwmon3/pwm2"
+FAN4_PWM="/sys/class/hwmon/hwmon3/pwm4"
 
 # PWM mode paths (only for connected fans)
-FAN1_MODE="/sys/class/hwmon/hwmon4/pwm1_mode"
-FAN2_MODE="/sys/class/hwmon/hwmon4/pwm2_mode"
-FAN4_MODE="/sys/class/hwmon/hwmon4/pwm4_mode"
+FAN1_MODE="/sys/class/hwmon/hwmon3/pwm1_mode"
+FAN2_MODE="/sys/class/hwmon/hwmon3/pwm2_mode"
+FAN4_MODE="/sys/class/hwmon/hwmon3/pwm4_mode"
 
 # PWM enable paths (only for connected fans)
-FAN1_ENABLE="/sys/class/hwmon/hwmon4/pwm1_enable"
-FAN2_ENABLE="/sys/class/hwmon/hwmon4/pwm2_enable"
-FAN4_ENABLE="/sys/class/hwmon/hwmon4/pwm4_enable"
+FAN1_ENABLE="/sys/class/hwmon/hwmon3/pwm1_enable"
+FAN2_ENABLE="/sys/class/hwmon/hwmon3/pwm2_enable"
+FAN4_ENABLE="/sys/class/hwmon/hwmon3/pwm4_enable"
 
 # Temperature sensor paths
-CPU_TEMP="/sys/class/hwmon/hwmon4/temp2_input"  # CPUTIN
-SYS_TEMP="/sys/class/hwmon/hwmon4/temp1_input"  # SYSTIN
-PECI_TEMP="/sys/class/hwmon/hwmon4/temp8_input" # PECI Agent 0
+CPU_TEMP="/sys/class/hwmon/hwmon3/temp2_input"  # CPUTIN
+SYS_TEMP="/sys/class/hwmon/hwmon3/temp1_input"  # SYSTIN
+PECI_TEMP="/sys/class/hwmon/hwmon3/temp8_input" # PECI Agent 0
 
 # Store last fan speed for hysteresis
 LAST_FAN_SPEED=$FAN_MIN
@@ -48,6 +51,8 @@ show_usage() {
     echo "  --min-speed SPEED   Set minimum fan speed in % (default: 8)"
     echo "  --max-speed SPEED   Set maximum fan speed in % (default: 100)"
     echo "  --interval SECONDS  Set check interval in seconds (default: 5)"
+    echo "  --csv-dir DIR      Directory for CSV files (enables daily rotation)"
+    echo "  --csv-delimiter D  CSV delimiter (default: ,)"
     echo "  --help             Show this help message"
     echo
     echo "Without options, runs in automatic temperature-based control mode."
@@ -179,6 +184,37 @@ calculate_fan_speed() {
     echo "$new_speed"
 }
 
+# Function to get current CSV file path
+get_csv_file() {
+    if [ ! -z "$CSV_DIR" ]; then
+        # Create directory if it doesn't exist
+        mkdir -p "$CSV_DIR"
+        # Return path with current date
+        echo "$CSV_DIR/temperatures_$(date '+%Y-%m-%d').csv"
+    else
+        echo "$CSV_FILE"
+    fi
+}
+
+# Function to write data to CSV file
+write_to_csv() {
+    local cpu_temp=$1
+    local sys_temp=$2
+    local peci_temp=$3
+    local cpu_usage=$4
+    local fan_speed=$5
+    local current_csv_file
+
+    if [ ! -z "$CSV_FILE" ] || [ ! -z "$CSV_DIR" ]; then
+        current_csv_file=$(get_csv_file)
+        # Create file with headers if it doesn't exist
+        if [ ! -f "$current_csv_file" ]; then
+            echo "Timestamp${CSV_DELIMITER}CPU Temp (°C)${CSV_DELIMITER}System Temp (°C)${CSV_DELIMITER}PECI Temp (°C)${CSV_DELIMITER}CPU Usage (%)${CSV_DELIMITER}Fan Speed (%)" > "$current_csv_file"
+        fi
+        echo "$(date '+%Y-%m-%d %H:%M:%S')${CSV_DELIMITER}$((cpu_temp/1000))${CSV_DELIMITER}$((sys_temp/1000))${CSV_DELIMITER}$((peci_temp/1000))${CSV_DELIMITER}$cpu_usage${CSV_DELIMITER}$((fan_speed*100/255))" >> "$current_csv_file"
+    fi
+}
+
 # Parse command line arguments
 MANUAL_SPEED=""
 while [[ $# -gt 0 ]]; do
@@ -205,6 +241,18 @@ while [[ $# -gt 0 ]]; do
             ;;
         --interval)
             CHECK_INTERVAL="$2"
+            shift 2
+            ;;
+        --csv-file)
+            CSV_FILE="$2"
+            shift 2
+            ;;
+        --csv-dir)
+            CSV_DIR="$2"
+            shift 2
+            ;;
+        --csv-delimiter)
+            CSV_DELIMITER="$2"
             shift 2
             ;;
         --help)
@@ -263,7 +311,10 @@ while true; do
     set_fan_speed "$FAN4_PWM" "$fan_speed"
 
     # Log temperature, CPU usage, and fan speed
-    logger "Fan Control: CPU Temp: $((cpu_temp/1000))°C, System Temp: $((sys_temp/1000))°C, CPU Usage: ${cpu_usage}%, Fan Speed: $((fan_speed*100/255))%"
+    logger "Fan Control: CPU Temp: $((cpu_temp/1000))°C, System Temp: $((sys_temp/1000))°C, PECI Temp: $((peci_temp/1000))°C, CPU Usage: ${cpu_usage}%, Fan Speed: $((fan_speed*100/255))%"
+    
+    # Write to CSV file if enabled
+    write_to_csv "$cpu_temp" "$sys_temp" "$peci_temp" "$cpu_usage" "$fan_speed"
 
     # Wait before next check
     sleep "$CHECK_INTERVAL"
