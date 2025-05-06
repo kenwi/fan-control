@@ -212,6 +212,19 @@ get_csv_file() {
     echo "$CSV_DIR/temperatures_$(date '+%Y-%m-%d').csv"
 }
 
+# Function to get GPU temperature and fan speed (NVIDIA only)
+get_gpu_info() {
+    if command -v nvidia-smi >/dev/null 2>&1; then
+        local output
+        output=$(nvidia-smi --query-gpu=temperature.gpu,fan.speed --format=csv,noheader,nounits | head -n1)
+        local gpu_temp=$(echo "$output" | awk -F',' '{print $1}' | xargs)
+        local gpu_fan=$(echo "$output" | awk -F',' '{print $2}' | xargs)
+        echo "$gpu_temp" "$gpu_fan"
+    else
+        echo "0 0"
+    fi
+}
+
 # Function to write data to CSV file
 write_to_csv() {
     local cpu_temp=$1
@@ -219,15 +232,17 @@ write_to_csv() {
     local peci_temp=$3
     local cpu_usage=$4
     local fan_speed=$5
+    local gpu_temp=$6
+    local gpu_fan=$7
     local current_csv_file
 
     if [ ! -z "$CSV_DIR" ]; then
         current_csv_file=$(get_csv_file)
         # Create file with headers if it doesn't exist
         if [ ! -f "$current_csv_file" ]; then
-            echo "Timestamp${CSV_DELIMITER}CPU Temp (°C)${CSV_DELIMITER}System Temp (°C)${CSV_DELIMITER}PECI Temp (°C)${CSV_DELIMITER}CPU Usage (%)${CSV_DELIMITER}Fan Speed (%)" > "$current_csv_file"
+            echo "Timestamp${CSV_DELIMITER}CPU Temp (°C)${CSV_DELIMITER}System Temp (°C)${CSV_DELIMITER}PECI Temp (°C)${CSV_DELIMITER}CPU Usage (%)${CSV_DELIMITER}Fan Speed (%)${CSV_DELIMITER}GPU Temp (°C)${CSV_DELIMITER}GPU Fan Speed (%)" > "$current_csv_file"
         fi
-        echo "$(date '+%Y-%m-%d %H:%M:%S')${CSV_DELIMITER}$((cpu_temp/1000))${CSV_DELIMITER}$((sys_temp/1000))${CSV_DELIMITER}$((peci_temp/1000))${CSV_DELIMITER}$cpu_usage${CSV_DELIMITER}$((fan_speed*100/255))" >> "$current_csv_file"
+        echo "$(date '+%Y-%m-%d %H:%M:%S')${CSV_DELIMITER}$((cpu_temp/1000))${CSV_DELIMITER}$((sys_temp/1000))${CSV_DELIMITER}$((peci_temp/1000))${CSV_DELIMITER}$cpu_usage${CSV_DELIMITER}$((fan_speed*100/255))${CSV_DELIMITER}$gpu_temp${CSV_DELIMITER}$gpu_fan" >> "$current_csv_file"
     fi
 }
 
@@ -315,6 +330,9 @@ while true; do
     # Get CPU usage
     cpu_usage=$(get_cpu_usage)
 
+    # Get GPU temperature and fan speed
+    read gpu_temp gpu_fan < <(get_gpu_info)
+
     # Use the highest temperature
     max_temp=$((cpu_temp > sys_temp ? cpu_temp : sys_temp))
     max_temp=$((max_temp > peci_temp ? max_temp : peci_temp))
@@ -327,11 +345,11 @@ while true; do
     set_fan_speed "$FAN2_PWM" "$fan_speed"
     set_fan_speed "$FAN4_PWM" "$fan_speed"
 
-    # Log temperature, CPU usage, and fan speed
-    logger "Fan Control: CPU Temp: $((cpu_temp/1000))°C, System Temp: $((sys_temp/1000))°C, PECI Temp: $((peci_temp/1000))°C, CPU Usage: ${cpu_usage}%, Fan Speed: $((fan_speed*100/255))%"
+    # Log temperature, CPU usage, fan speed, and GPU info
+    logger "Fan Control: CPU Temp: $((cpu_temp/1000))°C, System Temp: $((sys_temp/1000))°C, PECI Temp: $((peci_temp/1000))°C, CPU Usage: ${cpu_usage}%, Fan Speed: $((fan_speed*100/255))%, GPU Temp: ${gpu_temp}°C, GPU Fan: ${gpu_fan}%"
     
     # Write to CSV file if enabled
-    write_to_csv "$cpu_temp" "$sys_temp" "$peci_temp" "$cpu_usage" "$fan_speed"
+    write_to_csv "$cpu_temp" "$sys_temp" "$peci_temp" "$cpu_usage" "$fan_speed" "$gpu_temp" "$gpu_fan"
 
     # Wait before next check
     sleep "$CHECK_INTERVAL"

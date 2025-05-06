@@ -22,7 +22,10 @@ def plot_temperature_data(csv_file, smooth_window=None):
             df['PECI Temp (°C)'] = df['PECI Temp (°C)'].rolling(window=smooth_window, center=True).mean()
             df['Fan Speed (%)'] = df['Fan Speed (%)'].rolling(window=smooth_window, center=True).mean()
             df['CPU Usage (%)'] = df['CPU Usage (%)'].rolling(window=smooth_window, center=True).mean()
-            
+            if 'GPU Temp (°C)' in df.columns:
+                df['GPU Temp (°C)'] = df['GPU Temp (°C)'].rolling(window=smooth_window, center=True).mean()
+            if 'GPU Fan Speed (%)' in df.columns:
+                df['GPU Fan Speed (%)'] = df['GPU Fan Speed (%)'].rolling(window=smooth_window, center=True).mean()
             # Drop NaN values that result from rolling average
             df = df.dropna()
         
@@ -35,32 +38,52 @@ def plot_temperature_data(csv_file, smooth_window=None):
         peci_stats = f"PECI Temp: {df['PECI Temp (°C)'].mean():.1f}°C avg, {df['PECI Temp (°C)'].max():.1f}°C max"
         fan_stats = f"Fan Speed: {df['Fan Speed (%)'].mean():.1f}% avg, {df['Fan Speed (%)'].max():.1f}% max"
         cpu_load_stats = f"CPU Load: {df['CPU Usage (%)'].mean():.1f}% avg, {df['CPU Usage (%)'].max():.1f}% max"
+        gpu_temp_stats = None
+        gpu_fan_stats = None
+        if 'GPU Temp (°C)' in df.columns:
+            gpu_temp_stats = f"GPU Temp: {df['GPU Temp (°C)'].mean():.1f}°C avg, {df['GPU Temp (°C)'].max():.1f}°C max"
+        if 'GPU Fan Speed (%)' in df.columns:
+            gpu_fan_stats = f"GPU Fan: {df['GPU Fan Speed (%)'].mean():.1f}% avg, {df['GPU Fan Speed (%)'].max():.1f}% max"
         
         # Plot temperatures and keep handles for legend
         cpu_line, = ax1.plot(df['Timestamp'], df['CPU Temp (°C)'], label=cpu_stats, color='red')
         sys_line, = ax1.plot(df['Timestamp'], df['System Temp (°C)'], label=sys_stats, color='orange')
         peci_line, = ax1.plot(df['Timestamp'], df['PECI Temp (°C)'], label=peci_stats, color='green')
+        gpu_temp_line = None
+        if 'GPU Temp (°C)' in df.columns:
+            gpu_temp_line, = ax1.plot(df['Timestamp'], df['GPU Temp (°C)'], label=gpu_temp_stats, color='magenta')
         
-        # Plot fan speed and CPU load on secondary y-axis and keep handles for legend
+        # Plot fan speed, CPU load, and GPU fan speed on secondary y-axis and keep handles for legend
         ax2 = ax1.twinx()
         fan_line, = ax2.plot(df['Timestamp'], df['Fan Speed (%)'], label=fan_stats, color='blue', linestyle='--')
         cpu_load_line, = ax2.plot(df['Timestamp'], df['CPU Usage (%)'], label=cpu_load_stats, color='purple', linestyle=':')
+        gpu_fan_line = None
+        if 'GPU Fan Speed (%)' in df.columns:
+            gpu_fan_line, = ax2.plot(df['Timestamp'], df['GPU Fan Speed (%)'], label=gpu_fan_stats, color='cyan', linestyle='-.')
         
         # Customize the plot
-        title = 'Temperature, Fan Speed, and CPU Load Over Time'
+        title = 'System & GPU Temperatures, Fan Speeds, and CPU Load Over Time'
         if smooth_window:
             title += f' (Smoothed, Window={smooth_window})'
         plt.title(title, pad=20)
         ax1.set_xlabel('Time')
         ax1.set_ylabel('Temperature (°C)')
-        ax2.set_ylabel('Fan Speed / CPU Load (%)')
+        ax2.set_ylabel('Fan Speed / CPU Load / GPU Fan (%)')
         
         # Add grid
         ax1.grid(True, linestyle='--', alpha=0.7)
         
         # Add a single combined legend with all lines
-        lines = [cpu_line, sys_line, peci_line, fan_line, cpu_load_line]
-        labels = [cpu_stats, sys_stats, peci_stats, fan_stats, cpu_load_stats]
+        lines = [cpu_line, sys_line, peci_line]
+        labels = [cpu_stats, sys_stats, peci_stats]
+        if gpu_temp_line:
+            lines.append(gpu_temp_line)
+            labels.append(gpu_temp_stats)
+        lines += [fan_line, cpu_load_line]
+        labels += [fan_stats, cpu_load_stats]
+        if gpu_fan_line:
+            lines.append(gpu_fan_line)
+            labels.append(gpu_fan_stats)
         legend = ax1.legend(lines, labels, loc='upper left', bbox_to_anchor=(0.01, 0.99), framealpha=0.9, fontsize=9)
         legend.set_title('Measurements', prop={'size': 10, 'weight': 'bold'})
         
