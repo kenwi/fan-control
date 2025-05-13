@@ -1,6 +1,6 @@
 # Fan Control System
 
-A Linux-based fan control system for NCT6798-based motherboards that provides temperature-based fan speed control using cubic interpolation.
+A Linux-based fan control system for NCT6798-based motherboards that provides temperature-based fan speed control a non-linear response curve.
 
 ## Overview
 
@@ -17,7 +17,7 @@ The curve shows how fan speed varies with temperature:
 
 ## How It Works
 
-The fan speed is calculated using cubic interpolation:
+The fan speed is calculated using a cubic easing function between tempMin and tempMax. This creates a non-linear response that ramps up fan speed more aggressively as temperature increases:
 
 $$
 \text{fanSpeed} = \text{fanMin} + \frac{(\text{temp} - \text{tempMin})^3 \times (\text{fanMax} - \text{fanMin})}{(\text{tempMax} - \text{tempMin})^3}
